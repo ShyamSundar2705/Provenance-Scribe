@@ -38,6 +38,8 @@ class ConsultationSession(Base):
     patient_age: Mapped[int] = mapped_column(Integer, nullable=False)
     patient_gender: Mapped[str] = mapped_column(String, nullable=False)
     status: Mapped[str] = mapped_column(String, default="created", nullable=False)
+    consent_given: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, onupdate=_utcnow

@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,6 +8,7 @@ from app.core.auth import get_current_doctor
 from app.core.db import get_db
 from app.models.db_models import AuditLog, ConsultationSession, Doctor
 from app.schemas.consultations import (
+    ConsentRequest,
     ConsultationCreateRequest,
     ConsultationDetail,
     ConsultationListItem,
@@ -70,4 +73,38 @@ async def get_consultation(
     session = result.scalar_one_or_none()
     if session is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Consultation not found")
+    return ConsultationDetail.model_validate(session)
+
+
+@router.post("/{consultation_id}/consent", response_model=ConsultationDetail)
+async def record_consent(
+    consultation_id: str,
+    body: ConsentRequest,
+    doctor: Doctor = Depends(get_current_doctor),
+    db: AsyncSession = Depends(get_db),
+) -> ConsultationDetail:
+    result = await db.execute(
+        select(ConsultationSession).where(
+            ConsultationSession.id == consultation_id,
+            ConsultationSession.doctor_id == doctor.doctor_id,
+        )
+    )
+    session = result.scalar_one_or_none()
+    if session is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Consultation not found")
+
+    if not session.consent_given:
+        session.consent_given = True
+        session.consent_at = datetime.now(timezone.utc)
+        db.add(
+            AuditLog(
+                doctor_id=doctor.doctor_id,
+                action="CONSENT_RECORDED",
+                session_id=session.id,
+                detail=f"Consent recorded for patient {session.patient_name}",
+            )
+        )
+        await db.commit()
+        await db.refresh(session)
+
     return ConsultationDetail.model_validate(session)

@@ -9,6 +9,8 @@ interface ConsultationDetailData {
   patient_age: number;
   patient_gender: string;
   status: string;
+  consent_given: boolean;
+  consent_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -22,6 +24,9 @@ type LoadState =
 export function ConsultationDetail() {
   const { id } = useParams<{ id: string }>();
   const [state, setState] = useState<LoadState>({ kind: "loading" });
+  const [consentChecked, setConsentChecked] = useState(false);
+  const [recordingConsent, setRecordingConsent] = useState(false);
+  const [consentError, setConsentError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -82,6 +87,22 @@ export function ConsultationDetail() {
 
   const { data } = state;
 
+  const handleRecordConsent = async () => {
+    setRecordingConsent(true);
+    setConsentError(null);
+    try {
+      const res = await api.post<ConsultationDetailData>(
+        `/api/v1/consultations/${id}/consent`,
+        { consent: true }
+      );
+      setState({ kind: "loaded", data: res.data });
+    } catch {
+      setConsentError("Failed to record consent. Please try again.");
+    } finally {
+      setRecordingConsent(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="border-b border-slate-200 bg-white px-6 py-4">
@@ -115,9 +136,41 @@ export function ConsultationDetail() {
           </dl>
         </div>
 
-        <div className="mt-6 rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
-          No transcript yet
-        </div>
+        {data.consent_given ? (
+          <>
+            <div className="mt-6 rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-700">
+              Consent recorded on {new Date(data.consent_at!).toLocaleString()}
+            </div>
+            <div className="mt-6 rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
+              No transcript yet
+            </div>
+          </>
+        ) : (
+          <div className="mt-6 rounded-lg border border-slate-200 bg-white p-6">
+            <h2 className="text-sm font-medium text-slate-900">Patient consent</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              I confirm the patient has given informed verbal consent to record and process
+              this consultation for clinical documentation.
+            </p>
+            <label className="mt-4 flex items-center gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={consentChecked}
+                onChange={(e) => setConsentChecked(e.target.checked)}
+              />
+              I confirm the above
+            </label>
+            {consentError && <p className="mt-2 text-sm text-red-700">{consentError}</p>}
+            <button
+              type="button"
+              disabled={!consentChecked || recordingConsent}
+              onClick={handleRecordConsent}
+              className="mt-4 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {recordingConsent ? "Recording..." : "Record consent"}
+            </button>
+          </div>
+        )}
       </main>
     </div>
   );
