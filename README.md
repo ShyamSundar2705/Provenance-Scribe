@@ -6,9 +6,10 @@ closed set of safety-critical facts against what was actually said in the consul
 highlighting exactly which parts a clinician should confirm before signing.
 
 > **Working repo name:** `provenance-scribe` · **Status:** under active development,
-> built one module at a time. The doctor-facing application shell is complete and verified;
-> the verification layer (the core research contribution) is the next phase. See
-> [Project status](#project-status) for an honest module-by-module breakdown.
+> built one module at a time. The doctor-facing application shell, including the consent
+> gate, is complete and verified; the verification layer (the core research contribution)
+> is the next phase. See [Project status](#project-status) for an honest module-by-module
+> breakdown.
 
 ---
 
@@ -63,8 +64,8 @@ Built strictly module by module. This table is the source of truth for what actu
 |---|--------|-------|
 | S1 | Doctor authentication (JWT, bcrypt, protected routes) | ✅ **Built & verified** |
 | S2 | Dashboard + patient intake, Postgres in Docker | ✅ **Built & verified** |
-| S3 | Patient consent to record | ⏳ Planned (next) |
-| C0 | Consultation capture / text-in → builds the transcript | ⏳ Planned |
+| S3 | Patient consent to record | ✅ **Built & verified** |
+| C0 | Consultation capture / text-in → builds the transcript | ⏳ Planned (next) |
 | C1 | Note generation (Tanglish → clean note) | ⏳ Planned |
 | C2 | Safety-entity extraction | ⏳ Planned |
 | C3 | Assertion comparison + three-tier classification | ⏳ Planned — **the core contribution** |
@@ -72,10 +73,11 @@ Built strictly module by module. This table is the source of truth for what actu
 | E1 | Evaluation harness (recall / precision on planted-error set) | ⏳ Planned |
 | F1 | Live ASR adapter (reused from prior work) | ⏳ Planned — reused, not a contribution |
 
-**In plain terms:** you can currently register a doctor, log in, and create/list
-consultations with patient details, backed by Postgres. The note-generation and
-verification pipeline — the research core — has **not been implemented yet**. Nothing here
-is deployed, and no evaluation results exist yet.
+**In plain terms:** you can currently register a doctor, log in, create/list consultations
+with patient details (backed by Postgres), and record the doctor's attestation of patient
+consent before any capture happens. The note-generation and verification pipeline — the
+research core — has **not been implemented yet**. Nothing here is deployed, and no
+evaluation results exist yet.
 
 ---
 
@@ -185,9 +187,9 @@ CLAUDE.md            # standing context / conventions for the codebase
 
 ## Roadmap
 
-Nearest next steps: S3 (consent gate) → C0 (text-in) → C1 (note generation) → C2/C3 (the
-verification core) → C4 (review UI) → E1 (evaluation). The reused ASR front-end (F1) is
-wired in last, as a demo capability rather than a graded contribution.
+Nearest next steps: C0 (text-in) → C1 (note generation) → C2/C3 (the verification core) →
+C4 (review UI) → E1 (evaluation). The reused ASR front-end (F1) is wired in last, as a demo
+capability rather than a graded contribution.
 
 ---
 
