@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, String
+from sqlalchemy import Boolean, DateTime, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
@@ -27,6 +27,21 @@ class Doctor(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
     last_login: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class ConsultationSession(Base):
+    __tablename__ = "consultation_sessions"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    doctor_id: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    patient_name: Mapped[str] = mapped_column(String, nullable=False)
+    patient_age: Mapped[int] = mapped_column(Integer, nullable=False)
+    patient_gender: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, default="created", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+    )
 
 
 class AuditLog(Base):

@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { LoginPage } from "./pages/LoginPage";
-import { DashboardPlaceholder } from "./pages/DashboardPlaceholder";
+import { Dashboard } from "./pages/Dashboard";
+import { ConsultationDetail } from "./pages/ConsultationDetail";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
 export default function App() {
@@ -12,7 +13,15 @@ export default function App() {
           path="/"
           element={
             <ProtectedRoute>
-              <DashboardPlaceholder />
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/consultations/:id"
+          element={
+            <ProtectedRoute>
+              <ConsultationDetail />
             </ProtectedRoute>
           }
         />

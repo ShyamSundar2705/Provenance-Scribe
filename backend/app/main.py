@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.auth_router import router as auth_router
+from app.api.consultations_router import router as consultations_router
 from app.core.config import settings
 from app.core.db import init_db
 
@@ -26,3 +27,4 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
+app.include_router(consultations_router)
