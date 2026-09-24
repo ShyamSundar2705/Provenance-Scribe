@@ -6,10 +6,10 @@ closed set of safety-critical facts against what was actually said in the consul
 highlighting exactly which parts a clinician should confirm before signing.
 
 > **Working repo name:** `provenance-scribe` · **Status:** under active development,
-> built one module at a time. The doctor-facing application shell, including the consent
-> gate, is complete and verified; the verification layer (the core research contribution)
-> is the next phase. See [Project status](#project-status) for an honest module-by-module
-> breakdown.
+> built one module at a time. The application shell (S1–S3) is verified; the note
+> pipeline, verification engine and review UI (C0–C4) are built but so far only exercised
+> with a mocked LLM. No evaluation has been run. See [Project status](#project-status)
+> for an honest module-by-module breakdown.
 
 ---
 
@@ -65,19 +65,20 @@ Built strictly module by module. This table is the source of truth for what actu
 | S1 | Doctor authentication (JWT, bcrypt, protected routes) | ✅ **Built & verified** |
 | S2 | Dashboard + patient intake, Postgres in Docker | ✅ **Built & verified** |
 | S3 | Patient consent to record | ✅ **Built & verified** |
-| C0 | Consultation capture / text-in → builds the transcript | ⏳ Planned (next) |
-| C1 | Note generation (Tanglish → clean note) | ⏳ Planned |
-| C2 | Safety-entity extraction | ⏳ Planned |
-| C3 | Assertion comparison + three-tier classification | ⏳ Planned — **the core contribution** |
-| C4 | Clinician review UI (provenance highlighting) | ⏳ Planned |
-| E1 | Evaluation harness (recall / precision on planted-error set) | ⏳ Planned |
+| C0 | Consultation capture / text-in → builds the transcript | 🟡 **Built** — tested with mocked LLM only |
+| C1 | Note generation (Tanglish → SOAP note) | 🟡 **Built** — mocked Groq only |
+| C2 | Safety-entity extraction | 🟡 **Built** — mocked Groq only |
+| C3 | Assertion comparison + three-tier classification | 🟡 **Built** — **the core contribution**; deterministic paths tested with mocks, LLM-escalation path not yet exercised |
+| C4 | Clinician review UI (provenance highlighting) | 🟡 **Built** — typechecks; not yet checked in a browser |
+| E1 | Evaluation harness (recall / precision on planted-error set) | ⏳ Planned (next) |
 | F1 | Live ASR adapter (reused from prior work) | ⏳ Planned — reused, not a contribution |
 
-**In plain terms:** you can currently register a doctor, log in, create/list consultations
-with patient details (backed by Postgres), and record the doctor's attestation of patient
-consent before any capture happens. The note-generation and verification pipeline — the
-research core — has **not been implemented yet**. Nothing here is deployed, and no
-evaluation results exist yet.
+**In plain terms:** you can register a doctor, log in, create consultations, record patient
+consent, paste a Tamil–English transcript, generate a SOAP note, run verification, and
+review the flagged facts with the supporting transcript span highlighted. The LLM steps
+need a Groq key and model (`GROQ_API_KEY`, `GROQ_MODEL`) and have only been run against a
+mocked response so far. Nothing here is deployed, and **no evaluation results exist yet** —
+no accuracy, recall or precision figures should be inferred.
 
 ---
 
@@ -121,6 +122,7 @@ DEV / EVAL:   typed / synthetic transcript ────────────�
 # 1. Configure environment (never commit the real .env)
 cp .env.example .env
 #    then fill in JWT_SECRET and the Postgres credentials in .env
+#    (also backend/.env: GROQ_API_KEY and GROQ_MODEL — verify the model name on the Groq console)
 
 # 2. Start Postgres (containerised)
 docker compose up -d
@@ -154,8 +156,10 @@ To reset the database to a clean slate: `docker compose down -v` (drops the volu
 backend/
   app/
     core/     # config, async DB layer, auth (JWT + bcrypt)
-    models/   # SQLAlchemy models (Doctor, AuditLog, ConsultationSession)
-    schemas/  # Pydantic request/response models
+    models/   # SQLAlchemy models (Doctor, AuditLog, ConsultationSession, Transcript,
+              #   ClinicalNote, VerificationRun, FactCheck)
+    schemas/  # Pydantic request/response models (incl. the Transcript contract)
+    services/ # note pipeline, verification engine (LangGraph), Groq httpx client
     api/      # routers (auth, consultations)
     main.py
 frontend/
@@ -187,9 +191,9 @@ CLAUDE.md            # standing context / conventions for the codebase
 
 ## Roadmap
 
-Nearest next steps: C0 (text-in) → C1 (note generation) → C2/C3 (the verification core) →
-C4 (review UI) → E1 (evaluation). The reused ASR front-end (F1) is wired in last, as a demo
-capability rather than a graded contribution.
+Nearest next steps: run C0–C4 against the real Groq API and fix what surfaces, then E1
+(evaluation on a planted-error synthetic set). The reused ASR front-end (F1) is wired in
+last, as a demo capability rather than a graded contribution.
 
 ---
 
