@@ -2,6 +2,20 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
 
+interface TranscriptData {
+  raw_text: string;
+  language_mix: string;
+  source: string;
+}
+
+interface NoteData {
+  subjective: string;
+  objective: string;
+  assessment: string;
+  plan: string;
+  model_used: string;
+}
+
 interface ConsultationDetailData {
   id: string;
   doctor_id: string;
@@ -13,6 +27,8 @@ interface ConsultationDetailData {
   consent_at: string | null;
   created_at: string;
   updated_at: string;
+  transcript: TranscriptData | null;
+  note: NoteData | null;
 }
 
 type LoadState =
@@ -27,6 +43,10 @@ export function ConsultationDetail() {
   const [consentChecked, setConsentChecked] = useState(false);
   const [recordingConsent, setRecordingConsent] = useState(false);
   const [consentError, setConsentError] = useState<string | null>(null);
+  const [transcriptText, setTranscriptText] = useState("");
+  const [savingTranscript, setSavingTranscript] = useState(false);
+  const [generatingNote, setGeneratingNote] = useState(false);
+  const [captureError, setCaptureError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -103,6 +123,49 @@ export function ConsultationDetail() {
     }
   };
 
+  const handleSaveTranscript = async () => {
+    setSavingTranscript(true);
+    setCaptureError(null);
+    try {
+      await api.post(`/api/v1/consultations/${id}/transcript`, {
+        raw_text: transcriptText,
+        source: "typed",
+      });
+      const res = await api.get<ConsultationDetailData>(`/api/v1/consultations/${id}`);
+      setState({ kind: "loaded", data: res.data });
+    } catch {
+      setCaptureError("Failed to save transcript. Please try again.");
+    } finally {
+      setSavingTranscript(false);
+    }
+  };
+
+  const handleGenerateNote = async () => {
+    setGeneratingNote(true);
+    setCaptureError(null);
+    try {
+      await api.post(`/api/v1/consultations/${id}/note`);
+      const res = await api.get<ConsultationDetailData>(`/api/v1/consultations/${id}`);
+      setState({ kind: "loaded", data: res.data });
+    } catch {
+      setCaptureError("Failed to generate note. Please try again.");
+    } finally {
+      setGeneratingNote(false);
+    }
+  };
+
+  const rawTranscriptPanel = data.transcript && (
+    <div className="rounded-lg border border-slate-200 bg-white p-4">
+      <h2 className="text-sm font-medium text-slate-900">Raw transcript</h2>
+      <p className="mt-1 text-xs text-slate-500">
+        {data.transcript.language_mix} · {data.transcript.source}
+      </p>
+      <pre className="mt-3 whitespace-pre-wrap font-sans text-sm text-slate-800">
+        {data.transcript.raw_text}
+      </pre>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="border-b border-slate-200 bg-white px-6 py-4">
@@ -111,7 +174,7 @@ export function ConsultationDetail() {
         </Link>
       </header>
 
-      <main className="mx-auto max-w-2xl px-6 py-8">
+      <main className="mx-auto max-w-5xl px-6 py-8">
         <div className="rounded-lg border border-slate-200 bg-white p-6">
           <h1 className="mb-4 text-xl font-semibold text-slate-900">{data.patient_name}</h1>
           <dl className="grid grid-cols-2 gap-4 text-sm">
@@ -141,8 +204,67 @@ export function ConsultationDetail() {
             <div className="mt-6 rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-700">
               Consent recorded on {new Date(data.consent_at!).toLocaleString()}
             </div>
-            <div className="mt-6 rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
-              No transcript yet
+            <div className="mt-6">
+              {captureError && <p className="mb-2 text-sm text-red-700">{captureError}</p>}
+              {!data.transcript ? (
+                <div className="rounded-lg border border-slate-200 bg-white p-6">
+                  <label className="text-sm font-medium text-slate-900" htmlFor="transcript">
+                    Paste or type the consultation transcript (Tamil–English)
+                  </label>
+                  <textarea
+                    id="transcript"
+                    rows={10}
+                    value={transcriptText}
+                    onChange={(e) => setTranscriptText(e.target.value)}
+                    className="mt-2 w-full rounded-md border border-slate-300 p-2 text-sm"
+                  />
+                  <button
+                    type="button"
+                    disabled={!transcriptText.trim() || savingTranscript}
+                    onClick={handleSaveTranscript}
+                    className="mt-3 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {savingTranscript ? "Saving..." : "Save transcript"}
+                  </button>
+                </div>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    {rawTranscriptPanel}
+                    {!data.note && (
+                      <button
+                        type="button"
+                        disabled={generatingNote}
+                        onClick={handleGenerateNote}
+                        className="mt-3 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {generatingNote ? "Generating note..." : "Generate note"}
+                      </button>
+                    )}
+                  </div>
+                  {data.note && (
+                    <div className="rounded-lg border border-slate-200 bg-white p-4">
+                      <h2 className="text-sm font-medium text-slate-900">Clinical note (SOAP)</h2>
+                      {(["subjective", "objective", "assessment", "plan"] as const).map((k) => (
+                        <div key={k} className="mt-3">
+                          <h3 className="text-xs font-semibold uppercase text-slate-500">{k}</h3>
+                          <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">
+                            {data.note![k]}
+                          </p>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        disabled={generatingNote}
+                        onClick={handleGenerateNote}
+                        className="mt-4 rounded-md border border-slate-300 px-3 py-1.5 text-xs text-slate-700 disabled:opacity-40"
+                      >
+                        {generatingNote ? "Regenerating..." : "Regenerate note"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </>
         ) : (

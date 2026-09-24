@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, Integer, String
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
@@ -55,3 +55,32 @@ class AuditLog(Base):
     session_id: Mapped[str | None] = mapped_column(String, nullable=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
     detail: Mapped[str | None] = mapped_column(String, nullable=True)
+
+
+class Transcript(Base):
+    __tablename__ = "transcripts"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    session_id: Mapped[str] = mapped_column(
+        String, ForeignKey("consultation_sessions.id"), unique=True, nullable=False
+    )
+    raw_text: Mapped[str] = mapped_column(Text, nullable=False)
+    segments: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    language_mix: Mapped[str] = mapped_column(String, nullable=False)
+    source: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class ClinicalNote(Base):
+    __tablename__ = "clinical_notes"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    session_id: Mapped[str] = mapped_column(
+        String, ForeignKey("consultation_sessions.id"), unique=True, nullable=False
+    )
+    subjective: Mapped[str] = mapped_column(Text, nullable=False)
+    objective: Mapped[str] = mapped_column(Text, nullable=False)
+    assessment: Mapped[str] = mapped_column(Text, nullable=False)
+    plan: Mapped[str] = mapped_column(Text, nullable=False)
+    model_used: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)

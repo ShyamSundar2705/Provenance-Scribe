@@ -21,6 +21,29 @@ class ConsentRequest(BaseModel):
     consent: Literal[True]
 
 
+class TranscriptCreateRequest(BaseModel):
+    raw_text: str = Field(min_length=1)
+    source: Literal["typed", "synthetic"] = "typed"
+
+
+class TranscriptOut(BaseModel):
+    raw_text: str
+    language_mix: str
+    source: str
+
+    model_config = {"from_attributes": True}
+
+
+class NoteOut(BaseModel):
+    subjective: str
+    objective: str
+    assessment: str
+    plan: str
+    model_used: str
+
+    model_config = {"from_attributes": True}
+
+
 class ConsultationListItem(BaseModel):
     id: str
     patient_name: str
@@ -44,5 +67,7 @@ class ConsultationDetail(BaseModel):
     consent_at: datetime | None
     created_at: datetime
     updated_at: datetime
+    transcript: TranscriptOut | None = None
+    note: NoteOut | None = None
 
     model_config = {"from_attributes": True}

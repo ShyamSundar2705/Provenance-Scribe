@@ -9,3 +9,5 @@ email-validator
 PyJWT
 bcrypt
 python-multipart
+httpx
+langgraph

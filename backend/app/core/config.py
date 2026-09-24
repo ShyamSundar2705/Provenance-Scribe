@@ -8,6 +8,8 @@ class Settings(BaseSettings):
     JWT_SECRET: str
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_HOURS: int = 8
+    GROQ_API_KEY: str = ""
+    GROQ_MODEL: str = ""
     CORS_ORIGINS: list[str] = ["http://localhost:5173"]
 
 
