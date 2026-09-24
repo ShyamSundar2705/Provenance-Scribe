@@ -1,24 +1,33 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import get_current_doctor
 from app.core.db import get_db
-from app.models.db_models import AuditLog, ClinicalNote, ConsultationSession, Doctor
+from app.models.db_models import (
+    AuditLog,
+    ClinicalNote,
+    ConsultationSession,
+    Doctor,
+    FactCheck,
+    VerificationRun,
+)
 from app.models.db_models import Transcript as TranscriptRow
 from app.schemas.consultations import (
     ConsentRequest,
     ConsultationCreateRequest,
     ConsultationDetail,
     ConsultationListItem,
+    FactCheckOut,
     NoteOut,
     TranscriptCreateRequest,
     TranscriptOut,
 )
 from app.services.note_pipeline import note_graph
 from app.services.transcript_service import build_transcript
+from app.services.verification import build_note_text, verify_graph
 
 router = APIRouter(prefix="/api/v1/consultations", tags=["consultations"])
 
@@ -48,6 +57,14 @@ async def _detail(db: AsyncSession, session: ConsultationSession) -> Consultatio
     detail = ConsultationDetail.model_validate(session)
     detail.transcript = TranscriptOut.model_validate(transcript) if transcript else None
     detail.note = NoteOut.model_validate(note) if note else None
+    checks = (
+        await db.execute(
+            select(FactCheck)
+            .where(FactCheck.session_id == session.id)
+            .order_by(FactCheck.created_at)
+        )
+    ).scalars().all()
+    detail.fact_checks = [FactCheckOut.model_validate(c) for c in checks]
     return detail
 
 
@@ -231,3 +248,64 @@ async def generate_note(
     await db.commit()
     await db.refresh(note)
     return NoteOut.model_validate(note)
+
+
+@router.post("/{consultation_id}/verify", response_model=list[FactCheckOut])
+async def verify_consultation(
+    consultation_id: str,
+    doctor: Doctor = Depends(get_current_doctor),
+    db: AsyncSession = Depends(get_db),
+) -> list[FactCheckOut]:
+    session = await _get_owned_session(db, consultation_id, doctor)
+    note = (
+        await db.execute(select(ClinicalNote).where(ClinicalNote.session_id == session.id))
+    ).scalar_one_or_none()
+    row = (
+        await db.execute(select(TranscriptRow).where(TranscriptRow.session_id == session.id))
+    ).scalar_one_or_none()
+    if note is None or row is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Note required before verification"
+        )
+
+    # Only Subjective + Objective are checked; Assessment/Plan are structurally excluded.
+    note_text = build_note_text(note.subjective, note.objective)
+    try:
+        state = await verify_graph.ainvoke(
+            {
+                "raw_text": row.raw_text,
+                "note_text": note_text,
+                "intake_age": session.patient_age,
+                "intake_gender": session.patient_gender,
+            }
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail="Verification service failed"
+        )
+
+    run = (
+        await db.execute(select(VerificationRun).where(VerificationRun.session_id == session.id))
+    ).scalar_one_or_none()
+    if run is None:
+        run = VerificationRun(session_id=session.id)
+        db.add(run)
+    run.note_text = note_text
+    run.note_entities = state["note_entities"]
+    run.transcript_entities = state["transcript_entities"]
+
+    await db.execute(delete(FactCheck).where(FactCheck.session_id == session.id))
+    checks = [FactCheck(session_id=session.id, **r) for r in state["results"]]
+    db.add_all(checks)
+
+    session.status = "checked"
+    db.add(
+        AuditLog(
+            doctor_id=doctor.doctor_id,
+            action="VERIFICATION_RUN",
+            session_id=session.id,
+            detail=f"Verification run: {len(checks)} note facts checked",
+        )
+    )
+    await db.commit()
+    return [FactCheckOut.model_validate(c) for c in checks]

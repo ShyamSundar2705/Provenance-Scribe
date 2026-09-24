@@ -84,3 +84,37 @@ class ClinicalNote(Base):
     plan: Mapped[str] = mapped_column(Text, nullable=False)
     model_used: Mapped[str] = mapped_column(String, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class VerificationRun(Base):
+    __tablename__ = "verification_runs"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    session_id: Mapped[str] = mapped_column(
+        String, ForeignKey("consultation_sessions.id"), unique=True, nullable=False
+    )
+    note_text: Mapped[str] = mapped_column(Text, nullable=False)  # what note offsets index into
+    note_entities: Mapped[list] = mapped_column(JSON, nullable=False)
+    transcript_entities: Mapped[list] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class FactCheck(Base):
+    __tablename__ = "fact_checks"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    session_id: Mapped[str] = mapped_column(
+        String, ForeignKey("consultation_sessions.id"), index=True, nullable=False
+    )
+    entity_type: Mapped[str] = mapped_column(String, nullable=False)
+    entity_value: Mapped[str] = mapped_column(String, nullable=False)
+    tier: Mapped[str] = mapped_column(String, nullable=False)
+    note_quote: Mapped[str | None] = mapped_column(Text, nullable=True)
+    note_char_start: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    note_char_end: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    transcript_quote: Mapped[str | None] = mapped_column(Text, nullable=True)
+    transcript_char_start: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    transcript_char_end: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    method: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)

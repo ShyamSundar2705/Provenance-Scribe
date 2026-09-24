@@ -44,6 +44,23 @@ class NoteOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class FactCheckOut(BaseModel):
+    id: str
+    entity_type: str
+    entity_value: str
+    tier: str
+    note_quote: str | None
+    note_char_start: int | None
+    note_char_end: int | None
+    transcript_quote: str | None
+    transcript_char_start: int | None
+    transcript_char_end: int | None
+    reason: str
+    method: str
+
+    model_config = {"from_attributes": True}
+
+
 class ConsultationListItem(BaseModel):
     id: str
     patient_name: str
@@ -69,5 +86,6 @@ class ConsultationDetail(BaseModel):
     updated_at: datetime
     transcript: TranscriptOut | None = None
     note: NoteOut | None = None
+    fact_checks: list[FactCheckOut] = []
 
     model_config = {"from_attributes": True}

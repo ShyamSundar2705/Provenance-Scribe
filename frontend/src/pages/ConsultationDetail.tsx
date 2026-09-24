@@ -16,6 +16,16 @@ interface NoteData {
   model_used: string;
 }
 
+interface FactCheckData {
+  id: string;
+  entity_type: string;
+  entity_value: string;
+  tier: string;
+  transcript_quote: string | null;
+  reason: string;
+  method: string;
+}
+
 interface ConsultationDetailData {
   id: string;
   doctor_id: string;
@@ -29,6 +39,7 @@ interface ConsultationDetailData {
   updated_at: string;
   transcript: TranscriptData | null;
   note: NoteData | null;
+  fact_checks: FactCheckData[];
 }
 
 type LoadState =
@@ -46,6 +57,7 @@ export function ConsultationDetail() {
   const [transcriptText, setTranscriptText] = useState("");
   const [savingTranscript, setSavingTranscript] = useState(false);
   const [generatingNote, setGeneratingNote] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const [captureError, setCaptureError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -151,6 +163,20 @@ export function ConsultationDetail() {
       setCaptureError("Failed to generate note. Please try again.");
     } finally {
       setGeneratingNote(false);
+    }
+  };
+
+  const handleVerify = async () => {
+    setVerifying(true);
+    setCaptureError(null);
+    try {
+      await api.post(`/api/v1/consultations/${id}/verify`);
+      const res = await api.get<ConsultationDetailData>(`/api/v1/consultations/${id}`);
+      setState({ kind: "loaded", data: res.data });
+    } catch {
+      setCaptureError("Failed to run verification. Please try again.");
+    } finally {
+      setVerifying(false);
     }
   };
 
@@ -261,6 +287,26 @@ export function ConsultationDetail() {
                       >
                         {generatingNote ? "Regenerating..." : "Regenerate note"}
                       </button>
+                      {/* TEMPORARY debug view for C2/C3 - replaced by the C4 review UI. */}
+                      <div className="mt-4 border-t border-slate-200 pt-3">
+                        <button
+                          type="button"
+                          disabled={verifying}
+                          onClick={handleVerify}
+                          className="rounded-md border border-slate-300 px-3 py-1.5 text-xs text-slate-700 disabled:opacity-40"
+                        >
+                          {verifying ? "Verifying..." : "Run verification"}
+                        </button>
+                        <ul className="mt-2 text-xs">
+                          {data.fact_checks.map((f) => (
+                            <li key={f.id}>
+                              {f.entity_type}: {f.entity_value} - {f.tier} ({f.method}) -{" "}
+                              {f.reason}
+                              {f.transcript_quote && ` - transcript: "${f.transcript_quote}"`}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     </div>
                   )}
                 </div>
