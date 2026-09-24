@@ -309,3 +309,25 @@ async def verify_consultation(
     )
     await db.commit()
     return [FactCheckOut.model_validate(c) for c in checks]
+
+
+@router.post("/{consultation_id}/review", response_model=ConsultationDetail)
+async def mark_reviewed(
+    consultation_id: str,
+    doctor: Doctor = Depends(get_current_doctor),
+    db: AsyncSession = Depends(get_db),
+) -> ConsultationDetail:
+    """Human-in-the-loop checkpoint: the clinician has seen the flags. Does not sign or lock."""
+    session = await _get_owned_session(db, consultation_id, doctor)
+    session.status = "reviewed"
+    db.add(
+        AuditLog(
+            doctor_id=doctor.doctor_id,
+            action="NOTE_REVIEWED",
+            session_id=session.id,
+            detail=f"Note reviewed for patient {session.patient_name}",
+        )
+    )
+    await db.commit()
+    await db.refresh(session)
+    return await _detail(db, session)

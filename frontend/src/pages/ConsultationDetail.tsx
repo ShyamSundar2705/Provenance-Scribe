@@ -2,29 +2,8 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
 
-interface TranscriptData {
-  raw_text: string;
-  language_mix: string;
-  source: string;
-}
-
-interface NoteData {
-  subjective: string;
-  objective: string;
-  assessment: string;
-  plan: string;
-  model_used: string;
-}
-
-interface FactCheckData {
-  id: string;
-  entity_type: string;
-  entity_value: string;
-  tier: string;
-  transcript_quote: string | null;
-  reason: string;
-  method: string;
-}
+import { ReviewPanel } from "../components/ReviewPanel";
+import type { FactCheckData, NoteData, TranscriptData } from "../components/ReviewPanel";
 
 interface ConsultationDetailData {
   id: string;
@@ -58,6 +37,7 @@ export function ConsultationDetail() {
   const [savingTranscript, setSavingTranscript] = useState(false);
   const [generatingNote, setGeneratingNote] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
   const [captureError, setCaptureError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -180,6 +160,19 @@ export function ConsultationDetail() {
     }
   };
 
+  const handleReview = async () => {
+    setReviewing(true);
+    setCaptureError(null);
+    try {
+      const res = await api.post<ConsultationDetailData>(`/api/v1/consultations/${id}/review`);
+      setState({ kind: "loaded", data: res.data });
+    } catch {
+      setCaptureError("Failed to mark as reviewed. Please try again.");
+    } finally {
+      setReviewing(false);
+    }
+  };
+
   const rawTranscriptPanel = data.transcript && (
     <div className="rounded-lg border border-slate-200 bg-white p-4">
       <h2 className="text-sm font-medium text-slate-900">Raw transcript</h2>
@@ -254,62 +247,32 @@ export function ConsultationDetail() {
                   </button>
                 </div>
               ) : (
-                <div className="grid gap-4 md:grid-cols-2">
+                data.note ? (
+                  <ReviewPanel
+                    note={data.note}
+                    transcript={data.transcript}
+                    factChecks={data.fact_checks}
+                    status={data.status}
+                    verifying={verifying}
+                    generatingNote={generatingNote}
+                    reviewing={reviewing}
+                    onVerify={handleVerify}
+                    onRegenerate={handleGenerateNote}
+                    onReview={handleReview}
+                  />
+                ) : (
                   <div>
                     {rawTranscriptPanel}
-                    {!data.note && (
-                      <button
-                        type="button"
-                        disabled={generatingNote}
-                        onClick={handleGenerateNote}
-                        className="mt-3 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        {generatingNote ? "Generating note..." : "Generate note"}
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      disabled={generatingNote}
+                      onClick={handleGenerateNote}
+                      className="mt-3 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {generatingNote ? "Generating note..." : "Generate note"}
+                    </button>
                   </div>
-                  {data.note && (
-                    <div className="rounded-lg border border-slate-200 bg-white p-4">
-                      <h2 className="text-sm font-medium text-slate-900">Clinical note (SOAP)</h2>
-                      {(["subjective", "objective", "assessment", "plan"] as const).map((k) => (
-                        <div key={k} className="mt-3">
-                          <h3 className="text-xs font-semibold uppercase text-slate-500">{k}</h3>
-                          <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">
-                            {data.note![k]}
-                          </p>
-                        </div>
-                      ))}
-                      <button
-                        type="button"
-                        disabled={generatingNote}
-                        onClick={handleGenerateNote}
-                        className="mt-4 rounded-md border border-slate-300 px-3 py-1.5 text-xs text-slate-700 disabled:opacity-40"
-                      >
-                        {generatingNote ? "Regenerating..." : "Regenerate note"}
-                      </button>
-                      {/* TEMPORARY debug view for C2/C3 - replaced by the C4 review UI. */}
-                      <div className="mt-4 border-t border-slate-200 pt-3">
-                        <button
-                          type="button"
-                          disabled={verifying}
-                          onClick={handleVerify}
-                          className="rounded-md border border-slate-300 px-3 py-1.5 text-xs text-slate-700 disabled:opacity-40"
-                        >
-                          {verifying ? "Verifying..." : "Run verification"}
-                        </button>
-                        <ul className="mt-2 text-xs">
-                          {data.fact_checks.map((f) => (
-                            <li key={f.id}>
-                              {f.entity_type}: {f.entity_value} - {f.tier} ({f.method}) -{" "}
-                              {f.reason}
-                              {f.transcript_quote && ` - transcript: "${f.transcript_quote}"`}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                )
               )}
             </div>
           </>
