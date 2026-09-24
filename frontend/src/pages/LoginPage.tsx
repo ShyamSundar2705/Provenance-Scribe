@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import { useAuthStore } from "../store/auth.store";
+import { TierIcon, Wordmark } from "../components/ui";
 
 type Tab = "signin" | "register";
 
@@ -89,152 +90,172 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-      <div className="w-full max-w-[420px] rounded-lg bg-white p-8 shadow">
-        <h1 className="mb-6 text-center text-xl font-semibold text-slate-900">
-          Provenance Scribe
-        </h1>
-
-        <div className="mb-6 flex rounded-md bg-slate-100 p-1">
-          <button
-            type="button"
-            className={`flex-1 rounded-sm py-2 text-sm font-medium transition-colors ${
-              tab === "signin" ? "bg-white text-slate-900 shadow" : "text-slate-500"
-            }`}
-            onClick={() => {
-              setTab("signin");
-              setError(null);
-            }}
-          >
-            Sign in
-          </button>
-          <button
-            type="button"
-            className={`flex-1 rounded-sm py-2 text-sm font-medium transition-colors ${
-              tab === "register" ? "bg-white text-slate-900 shadow" : "text-slate-500"
-            }`}
-            onClick={() => {
-              setTab("register");
-              setError(null);
-            }}
-          >
-            Register
-          </button>
+    <div className="grid min-h-screen md:grid-cols-[minmax(0,5fr)_minmax(0,4fr)]">
+      <aside className="flex flex-col justify-between bg-primary px-6 py-8 text-white sm:px-12 sm:py-12">
+        <Wordmark className="text-[32px] sm:text-[44px] sm:leading-none" />
+        <div className="my-10 max-w-lg md:my-0">
+          <p className="font-serif text-2xl leading-snug sm:text-[28px]">
+            Every safety-critical fact in the note, traced back to what was said.
+          </p>
+          <p className="mt-4 text-[15px] leading-relaxed text-white/85">
+            Provenance Scribe checks a fixed set of facts in a generated note (medications and
+            doses, allergies, symptoms, vitals) against the consultation transcript and shows
+            you what to confirm. It highlights; the clinician decides.
+          </p>
+          <ul className="mt-8 space-y-3 text-sm">
+            {[
+              ["verified", "Verified", "The transcript explicitly supports the fact."],
+              ["requires_confirmation", "Requires confirmation", "The note states it; the transcript does not."],
+              ["potential_conflict", "Potential conflict", "The note contradicts the transcript."],
+            ].map(([tier, label, text]) => (
+              <li key={tier} className="flex gap-3">
+                <TierIcon tier={tier} className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>
+                  <span className="font-semibold">{label}.</span>{" "}
+                  <span className="text-white/85">{text}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
+        <p className="hidden text-xs text-white/70 md:block">
+          Under development. Not a deployed or evaluated clinical system.
+        </p>
+      </aside>
 
-        {error && (
-          <div className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-            {error}
+      <main className="flex items-center justify-center px-4 py-10 sm:px-8">
+        <div className="w-full max-w-sm">
+          <div className="mb-6 flex gap-6 border-b border-line" role="tablist">
+            {(["signin", "register"] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                role="tab"
+                aria-selected={tab === t}
+                className={`-mb-px border-b-2 pb-2 text-sm font-medium ${
+                  tab === t
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted hover:text-ink"
+                }`}
+                onClick={() => {
+                  setTab(t);
+                  setError(null);
+                }}
+              >
+                {t === "signin" ? "Sign in" : "Register"}
+              </button>
+            ))}
           </div>
-        )}
 
-        {tab === "signin" ? (
-          <form className="space-y-4" onSubmit={handleSignIn}>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
-                Email
-              </label>
-              <input
-                type="email"
-                required
-                value={signinEmail}
-                onChange={(e) => setSigninEmail(e.target.value)}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
-                Password
-              </label>
-              <input
-                type="password"
-                required
-                value={signinPassword}
-                onChange={(e) => setSigninPassword(e.target.value)}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-md bg-slate-800 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
-            >
-              {loading ? "Signing in..." : "Sign in"}
-            </button>
-          </form>
-        ) : (
-          <form className="space-y-4" onSubmit={handleRegister}>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
-                Doctor ID
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="DR-001"
-                value={regDoctorId}
-                onChange={(e) => setRegDoctorId(e.target.value)}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
-                Full name
-              </label>
-              <input
-                type="text"
-                required
-                value={regFullName}
-                onChange={(e) => setRegFullName(e.target.value)}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
-                Specialisation (optional)
-              </label>
-              <input
-                type="text"
-                value={regSpecialisation}
-                onChange={(e) => setRegSpecialisation(e.target.value)}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
-                Email
-              </label>
-              <input
-                type="email"
-                required
-                value={regEmail}
-                onChange={(e) => setRegEmail(e.target.value)}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
-                Password
-              </label>
-              <input
-                type="password"
-                required
-                minLength={8}
-                value={regPassword}
-                onChange={(e) => setRegPassword(e.target.value)}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-md bg-slate-800 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
-            >
-              {loading ? "Registering..." : "Register"}
-            </button>
-          </form>
-        )}
-      </div>
+          {error && <div className="error-note mb-4">{error}</div>}
+
+          {tab === "signin" ? (
+            <form className="space-y-4" onSubmit={handleSignIn}>
+              <div>
+                <label htmlFor="signin-email" className="field-label">
+                  Email
+                </label>
+                <input
+                  id="signin-email"
+                  type="email"
+                  required
+                  value={signinEmail}
+                  onChange={(e) => setSigninEmail(e.target.value)}
+                  className="field"
+                />
+              </div>
+              <div>
+                <label htmlFor="signin-password" className="field-label">
+                  Password
+                </label>
+                <input
+                  id="signin-password"
+                  type="password"
+                  required
+                  value={signinPassword}
+                  onChange={(e) => setSigninPassword(e.target.value)}
+                  className="field"
+                />
+              </div>
+              <button type="submit" disabled={loading} className="btn btn-primary w-full">
+                {loading ? "Signing in..." : "Sign in"}
+              </button>
+            </form>
+          ) : (
+            <form className="space-y-4" onSubmit={handleRegister}>
+              <div>
+                <label htmlFor="reg-doctor-id" className="field-label">
+                  Doctor ID
+                </label>
+                <input
+                  id="reg-doctor-id"
+                  type="text"
+                  required
+                  placeholder="DR-001"
+                  value={regDoctorId}
+                  onChange={(e) => setRegDoctorId(e.target.value)}
+                  className="field"
+                />
+              </div>
+              <div>
+                <label htmlFor="reg-name" className="field-label">
+                  Full name
+                </label>
+                <input
+                  id="reg-name"
+                  type="text"
+                  required
+                  value={regFullName}
+                  onChange={(e) => setRegFullName(e.target.value)}
+                  className="field"
+                />
+              </div>
+              <div>
+                <label htmlFor="reg-spec" className="field-label">
+                  Specialisation (optional)
+                </label>
+                <input
+                  id="reg-spec"
+                  type="text"
+                  value={regSpecialisation}
+                  onChange={(e) => setRegSpecialisation(e.target.value)}
+                  className="field"
+                />
+              </div>
+              <div>
+                <label htmlFor="reg-email" className="field-label">
+                  Email
+                </label>
+                <input
+                  id="reg-email"
+                  type="email"
+                  required
+                  value={regEmail}
+                  onChange={(e) => setRegEmail(e.target.value)}
+                  className="field"
+                />
+              </div>
+              <div>
+                <label htmlFor="reg-password" className="field-label">
+                  Password
+                </label>
+                <input
+                  id="reg-password"
+                  type="password"
+                  required
+                  minLength={8}
+                  value={regPassword}
+                  onChange={(e) => setRegPassword(e.target.value)}
+                  className="field"
+                />
+              </div>
+              <button type="submit" disabled={loading} className="btn btn-primary w-full">
+                {loading ? "Registering..." : "Register"}
+              </button>
+            </form>
+          )}
+        </div>
+      </main>
     </div>
   );
 }

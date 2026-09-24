@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import { useAuthStore } from "../store/auth.store";
+import { AppHeader, StatusBadge, genderLabel } from "../components/ui";
 
 interface ConsultationListItem {
   id: string;
@@ -41,66 +42,72 @@ export function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
-        <div>
-          <p className="text-lg font-semibold text-slate-900">{fullName}</p>
-          {specialisation && <p className="text-sm text-slate-500">{specialisation}</p>}
+    <div className="min-h-screen">
+      <AppHeader>
+        <div className="hidden text-right sm:block">
+          <p className="text-sm font-medium text-ink">{fullName}</p>
+          {specialisation && <p className="text-xs text-muted">{specialisation}</p>}
         </div>
-        <button
-          onClick={handleLogout}
-          className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
-        >
+        <button onClick={handleLogout} className="btn btn-secondary py-1.5">
           Log out
         </button>
-      </header>
+      </AppHeader>
 
-      <main className="mx-auto max-w-3xl px-6 py-8">
-        <div className="mb-6 flex items-center justify-between">
-          <h1 className="text-xl font-semibold text-slate-900">Consultations</h1>
-          <button
-            onClick={() => setShowNewForm(true)}
-            className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
-          >
+      <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
+        <div className="mb-5 flex items-end justify-between gap-4">
+          <div>
+            <h1 className="font-serif text-[28px] font-semibold leading-tight text-ink">
+              Consultations
+            </h1>
+            <p className="mt-1 text-sm text-muted sm:hidden">{fullName}</p>
+          </div>
+          <button onClick={() => setShowNewForm(true)} className="btn btn-primary">
             New consultation
           </button>
         </div>
 
-        {loadError && (
-          <div className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-            {loadError}
-          </div>
-        )}
+        {loadError && <div className="error-note mb-4">{loadError}</div>}
 
-        {consultations === null && !loadError && (
-          <p className="text-sm text-slate-500">Loading...</p>
-        )}
+        {consultations === null && !loadError && <p className="text-sm text-muted">Loading...</p>}
 
         {consultations !== null && consultations.length === 0 && (
-          <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
-            No consultations yet. Start one with "New consultation".
+          <div className="rounded-lg border border-dashed border-line bg-surface px-6 py-14 text-center">
+            <p className="font-serif text-xl font-semibold text-ink">No consultations yet</p>
+            <p className="mx-auto mt-2 max-w-sm text-sm text-muted">
+              Start with a patient's details, record their consent, then paste a consultation
+              transcript to generate and check a note.
+            </p>
+            <button onClick={() => setShowNewForm(true)} className="btn btn-primary mt-5">
+              New consultation
+            </button>
           </div>
         )}
 
         {consultations !== null && consultations.length > 0 && (
-          <ul className="divide-y divide-slate-200 overflow-hidden rounded-lg border border-slate-200 bg-white">
+          <ul className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface">
             {consultations.map((c) => (
               <li key={c.id}>
                 <button
                   onClick={() => navigate(`/consultations/${c.id}`)}
-                  className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-slate-50"
+                  className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left hover:bg-paper"
                 >
-                  <div>
-                    <p className="text-sm font-medium text-slate-900">{c.patient_name}</p>
-                    <p className="text-xs text-slate-500">
-                      {c.patient_age} · {c.patient_gender}
+                  <div className="min-w-0">
+                    <p className="truncate font-serif text-lg font-semibold text-ink">
+                      {c.patient_name}
+                    </p>
+                    <p className="mt-0.5 text-sm text-muted">
+                      {c.patient_age} years, {genderLabel(c.patient_gender).toLowerCase()}
                     </p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-xs text-slate-500">
-                      {new Date(c.created_at).toLocaleDateString()}
+                  <div className="flex shrink-0 flex-col items-end gap-1.5">
+                    <StatusBadge status={c.status} />
+                    <p className="text-xs text-muted">
+                      {new Date(c.created_at).toLocaleDateString(undefined, {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
                     </p>
-                    <p className="text-xs font-medium uppercase text-slate-400">{c.status}</p>
                   </div>
                 </button>
               </li>
@@ -155,47 +162,58 @@ function NewConsultationModal({
   }
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black/40 px-4">
-      <div className="w-full max-w-[420px] rounded-lg bg-white p-6 shadow-lg">
-        <h2 className="mb-4 text-lg font-semibold text-slate-900">New consultation</h2>
+    <div
+      className="fixed inset-0 flex items-center justify-center bg-ink/50 px-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="new-consultation-title"
+    >
+      <div className="w-full max-w-[420px] rounded-lg bg-surface p-6 shadow-xl">
+        <h2 id="new-consultation-title" className="mb-4 font-serif text-xl font-semibold text-ink">
+          New consultation
+        </h2>
 
-        {error && (
-          <div className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-            {error}
-          </div>
-        )}
+        {error && <div className="error-note mb-4">{error}</div>}
 
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
+            <label htmlFor="patient-name" className="field-label">
               Patient name
             </label>
             <input
+              id="patient-name"
               type="text"
               required
+              autoFocus
               value={patientName}
               onChange={(e) => setPatientName(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+              className="field"
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Age</label>
+            <label htmlFor="patient-age" className="field-label">
+              Age
+            </label>
             <input
+              id="patient-age"
               type="number"
               required
               min={0}
               max={120}
               value={patientAge}
               onChange={(e) => setPatientAge(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+              className="field"
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Gender</label>
+            <label htmlFor="patient-gender" className="field-label">
+              Gender
+            </label>
             <select
+              id="patient-gender"
               value={patientGender}
               onChange={(e) => setPatientGender(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+              className="field"
             >
               <option value="male">Male</option>
               <option value="female">Female</option>
@@ -204,18 +222,10 @@ function NewConsultationModal({
           </div>
 
           <div className="flex gap-2 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 rounded-md border border-slate-300 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
+            <button type="button" onClick={onClose} className="btn btn-secondary flex-1">
               Cancel
             </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex-1 rounded-md bg-slate-800 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
-            >
+            <button type="submit" disabled={loading} className="btn btn-primary flex-1">
               {loading ? "Creating..." : "Create"}
             </button>
           </div>

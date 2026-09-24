@@ -1,1 +1,80 @@
 @import "tailwindcss";
+
+@theme {
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Source Serif 4", ui-serif, Georgia, serif;
+
+  --color-ink: #1b2233;
+  --color-muted: #566074;
+  --color-paper: #f1f3f6;
+  --color-surface: #ffffff;
+  --color-line: #d9dee6;
+
+  --color-primary: #4338a8;
+  --color-primary-strong: #362c8a;
+  --color-primary-tint: #eceaf8;
+
+  --color-conflict: #a61e3a;
+  --color-conflict-tint: #fbecef;
+  --color-conflict-mark: #f5cbd3;
+  --color-confirm: #8a5a00;
+  --color-confirm-tint: #fbf1d9;
+  --color-confirm-mark: #f4de9e;
+  --color-verified: #3d6b55;
+  --color-verified-tint: #edf4f0;
+  --color-verified-mark: #d3e6db;
+}
+
+html {
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  background: var(--color-paper);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--color-paper);
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply bg-primary text-white hover:bg-primary-strong;
+  }
+  .btn-secondary {
+    @apply border border-line bg-surface text-ink hover:bg-paper;
+  }
+  .field {
+    @apply w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-primary;
+  }
+  .field-label {
+    @apply mb-1 block text-sm font-medium text-ink;
+  }
+  .error-note {
+    @apply rounded-md border border-conflict/30 bg-conflict-tint px-3 py-2 text-sm text-conflict;
+  }
+}
+
+/* One deliberate motion moment: the transcript evidence mark, when a flag is selected. */
+@media (prefers-reduced-motion: no-preference) {
+  .evidence-mark {
+    animation: evidence-pulse 900ms ease-out 1;
+  }
+}
+@keyframes evidence-pulse {
+  from {
+    box-shadow: 0 0 0 5px rgb(67 56 168 / 0.35);
+  }
+  to {
+    box-shadow: 0 0 0 0 rgb(67 56 168 / 0);
+  }
+}

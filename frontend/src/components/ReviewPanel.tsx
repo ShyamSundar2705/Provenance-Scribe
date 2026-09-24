@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { TranscriptView } from "./TranscriptView";
+import { TierIcon, tierOf } from "./ui";
 
 export interface FactCheckData {
   id: string;
@@ -28,45 +30,23 @@ export interface TranscriptData {
   source: string;
 }
 
-interface TierStyle {
-  label: string;
-  icon: string;
-  card: string;
-  badge: string;
-  mark: string;
-  order: number;
-}
-
-// Colour + icon + text label: never colour alone.
-const TIERS: Record<string, TierStyle> = {
-  potential_conflict: {
-    label: "Potential Conflict",
-    icon: "⚠",
-    card: "border-red-400 bg-red-50",
-    badge: "bg-red-600 text-white",
-    mark: "bg-red-200 ring-1 ring-red-500",
-    order: 0,
-  },
-  requires_confirmation: {
-    label: "Requires Confirmation",
-    icon: "⚑",
-    card: "border-amber-300 bg-amber-50",
-    badge: "bg-amber-500 text-white",
-    mark: "bg-amber-200 ring-1 ring-amber-500",
-    order: 1,
-  },
-  verified: {
-    label: "Verified",
-    icon: "✓",
-    card: "border-slate-200 bg-white",
-    badge: "bg-green-100 text-green-800",
-    mark: "bg-green-100",
-    order: 2,
-  },
+const LANGUAGE_LABELS: Record<string, string> = {
+  "tamil-english": "Tamil–English",
+  english: "English",
+  tamil: "Tamil",
+};
+const SOURCE_LABELS: Record<string, string> = {
+  typed: "Typed",
+  synthetic: "Synthetic",
+  asr: "Speech recognition",
 };
 
-const FALLBACK_TIER: TierStyle = { ...TIERS.requires_confirmation, label: "Unknown", order: 3 };
-const tierOf = (t: string): TierStyle => TIERS[t] ?? FALLBACK_TIER;
+const SECTIONS = [
+  { key: "subjective", title: "Subjective", checked: true },
+  { key: "objective", title: "Objective", checked: true },
+  { key: "assessment", title: "Assessment", checked: false },
+  { key: "plan", title: "Plan", checked: false },
+] as const;
 
 /** Offsets index into the unmodified raw_text; fall back to searching the quote. */
 function resolveSpan(raw: string, f: FactCheckData): [number, number] | null {
@@ -102,7 +82,7 @@ function markSection(text: string, facts: FactCheckData[]): ReactNode {
   spans.forEach((sp, n) => {
     out.push(text.slice(pos, sp.s));
     out.push(
-      <span key={n} className={`rounded px-0.5 ${tierOf(sp.tier).mark}`}>
+      <span key={n} className={`rounded-[2px] px-0.5 ${tierOf(sp.tier).mark}`}>
         {text.slice(sp.s, sp.e)}
       </span>
     );
@@ -111,6 +91,11 @@ function markSection(text: string, facts: FactCheckData[]): ReactNode {
   out.push(text.slice(pos));
   return out;
 }
+
+const sentence = (s: string) => {
+  const t = s.replace(/_/g, " ");
+  return t.charAt(0).toUpperCase() + t.slice(1);
+};
 
 interface Props {
   note: NoteData;
@@ -160,152 +145,175 @@ export function ReviewPanel({
 
   const hasResults = factChecks.length > 0;
   const reviewed = status === "reviewed";
-  const visible = sorted.filter((f) => f.tier !== "verified" || showVerified);
+  const attention = sorted.filter((f) => f.tier !== "verified");
+  const verifiedList = sorted.filter((f) => f.tier === "verified");
 
-  const renderTranscript = () => {
-    const raw = transcript.raw_text;
-    if (!selected || !span) return raw;
+  const renderFlag = (f: FactCheckData) => {
+    const t = tierOf(f.tier);
+    const isSel = f.id === selectedId;
+    const notFound = !resolveSpan(transcript.raw_text, f);
+    const isConflict = f.tier === "potential_conflict";
+    const isVerified = f.tier === "verified";
     return (
-      <>
-        {raw.slice(0, span[0])}
-        <mark
-          ref={markRef}
-          className={`rounded px-0.5 text-slate-900 ${tierOf(selected.tier).mark}`}
+      <li key={f.id}>
+        <button
+          type="button"
+          aria-pressed={isSel}
+          onClick={() => setSelectedId(f.id)}
+          className={`block w-full rounded-md text-left transition-shadow hover:shadow-sm ${t.card} ${
+            isVerified ? "px-3 py-2 hover:bg-paper" : isConflict ? "px-4 py-3.5" : "px-3.5 py-3"
+          } ${isSel ? "ring-2 ring-primary ring-offset-1" : ""}`}
         >
-          {raw.slice(span[0], span[1])}
-        </mark>
-        {raw.slice(span[1])}
-      </>
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span
+              className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-semibold ${t.badge} ${
+                isVerified ? "px-0" : ""
+              }`}
+            >
+              <TierIcon tier={f.tier} className="h-3.5 w-3.5" />
+              {t.label}
+            </span>
+            <span className="text-xs text-muted">{sentence(f.entity_type)}</span>
+          </span>
+          <span
+            className={`mt-1 block ${
+              isConflict
+                ? "text-base font-semibold text-ink"
+                : isVerified
+                  ? "text-sm text-ink"
+                  : "text-sm font-medium text-ink"
+            }`}
+          >
+            {f.entity_value}
+          </span>
+          <span className={`mt-0.5 block text-[13px] ${isVerified ? "text-muted" : "text-ink/80"}`}>
+            {f.reason}
+          </span>
+          {isSel && notFound && (
+            <span className="mt-2 block rounded bg-surface/80 px-2 py-1 text-xs font-medium text-ink">
+              Not found in the transcript — confirm the source.
+            </span>
+          )}
+        </button>
+      </li>
     );
   };
 
   return (
     <div>
-      {/* Summary bar */}
-      <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-slate-200 bg-white px-4 py-3">
+      {/* Tier summary: conflicts dominate, verified stays quiet */}
+      <div className="mb-5 flex flex-wrap items-center gap-x-5 gap-y-3 rounded-lg border border-line bg-surface p-3 sm:p-4">
         {hasResults ? (
           <>
-            <span
-              className={
-                counts.potential_conflict > 0
-                  ? "rounded-md bg-red-600 px-3 py-1 text-base font-bold text-white"
-                  : "text-sm font-medium text-slate-600"
-              }
-            >
-              ⚠ {counts.potential_conflict} Potential Conflict
-              {counts.potential_conflict === 1 ? "" : "s"}
+            {counts.potential_conflict > 0 ? (
+              <span className="inline-flex items-center gap-2 rounded-md bg-conflict px-4 py-2 text-lg font-semibold text-white">
+                <TierIcon tier="potential_conflict" className="h-5 w-5" />
+                {counts.potential_conflict} potential conflict
+                {counts.potential_conflict === 1 ? "" : "s"}
+              </span>
+            ) : (
+              <span className="text-sm font-medium text-muted">No potential conflicts</span>
+            )}
+            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-confirm">
+              <TierIcon tier="requires_confirmation" />
+              {counts.requires_confirmation} require
+              {counts.requires_confirmation === 1 ? "s" : ""} confirmation
             </span>
-            <span className="text-sm font-medium text-amber-700">
-              ⚑ {counts.requires_confirmation} Require Confirmation
+            <span className="inline-flex items-center gap-1.5 text-sm text-verified">
+              <TierIcon tier="verified" />
+              {counts.verified} verified
             </span>
-            <span className="text-sm text-green-700">✓ {counts.verified} Verified</span>
           </>
         ) : (
-          <span className="text-sm text-slate-600">Verification has not been run yet.</span>
+          <span className="text-sm text-muted">Verification has not been run yet.</span>
         )}
         <button
           type="button"
           disabled={verifying}
           onClick={onVerify}
-          className="ml-auto rounded-md border border-slate-300 px-3 py-1.5 text-xs text-slate-700 disabled:opacity-40"
+          className="btn btn-secondary ml-auto py-1.5"
         >
           {verifying ? "Verifying..." : hasResults ? "Re-run verification" : "Run verification"}
         </button>
       </div>
 
-      <div className="grid items-start gap-4 md:grid-cols-2">
-        {/* Note + flags */}
-        <div className="space-y-4">
-          <div className="rounded-lg border border-slate-200 bg-white p-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-medium text-slate-900">Clinical note (SOAP)</h2>
+      <div className="grid items-start gap-6 md:grid-cols-2">
+        {/* Claims: flags, then the note */}
+        <div className="min-w-0 space-y-6">
+          {hasResults && (
+            <section aria-labelledby="flags-heading">
+              <h2 id="flags-heading" className="mb-2 text-sm font-semibold text-ink">
+                Needs your attention
+              </h2>
+              {attention.length === 0 ? (
+                <p className="text-sm text-muted">Nothing flagged for confirmation or conflict.</p>
+              ) : (
+                <ul className="space-y-2">{attention.map(renderFlag)}</ul>
+              )}
+              {verifiedList.length > 0 && (
+                <div className="mt-4">
+                  <button
+                    type="button"
+                    aria-expanded={showVerified}
+                    onClick={() => setShowVerified((v) => !v)}
+                    className="text-sm text-muted underline underline-offset-2 hover:text-ink"
+                  >
+                    {showVerified ? "Hide" : "Show"} {verifiedList.length} verified
+                  </button>
+                  {showVerified && <ul className="mt-2 space-y-1">{verifiedList.map(renderFlag)}</ul>}
+                </div>
+              )}
+            </section>
+          )}
+
+          <section aria-labelledby="note-heading" className="rounded-lg border border-line bg-surface">
+            <div className="sticky top-0 z-10 flex items-center justify-between gap-3 rounded-t-lg border-b border-line bg-surface px-4 py-3">
+              <h2 id="note-heading" className="text-sm font-semibold text-ink">
+                Generated note
+              </h2>
               <button
                 type="button"
                 disabled={generatingNote}
                 onClick={onRegenerate}
-                className="rounded-md border border-slate-300 px-3 py-1 text-xs text-slate-700 disabled:opacity-40"
+                className="btn btn-secondary py-1 text-xs"
               >
                 {generatingNote ? "Regenerating..." : "Regenerate note"}
               </button>
             </div>
-            {(["subjective", "objective", "assessment", "plan"] as const).map((k) => {
-              const checked = k === "subjective" || k === "objective";
-              return (
-                <div key={k} className="mt-3">
-                  <h3 className="text-xs font-semibold uppercase text-slate-500">{k}</h3>
-                  <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">
-                    {checked && hasResults ? markSection(note[k], factChecks) : note[k]}
+            <div className="divide-y divide-line px-4">
+              {SECTIONS.map(({ key, title, checked }) => (
+                <div key={key} className="py-3">
+                  <h3 className="flex items-baseline gap-2 text-[13px] font-semibold text-primary">
+                    {title}
+                    {!checked && (
+                      <span className="text-xs font-normal text-muted">Not part of verification</span>
+                    )}
+                  </h3>
+                  <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-ink">
+                    {checked && hasResults ? markSection(note[key], factChecks) : note[key]}
                   </p>
                 </div>
-              );
-            })}
-          </div>
-
-          {hasResults && (
-            <div>
-              <h2 className="mb-2 text-sm font-medium text-slate-900">Flags</h2>
-              <ul className="space-y-2">
-                {visible.map((f) => {
-                  const t = tierOf(f.tier);
-                  const isSel = f.id === selectedId;
-                  const notFound = !resolveSpan(transcript.raw_text, f);
-                  return (
-                    <li key={f.id}>
-                      <button
-                        type="button"
-                        aria-pressed={isSel}
-                        onClick={() => setSelectedId(f.id)}
-                        className={`w-full rounded-lg border p-3 text-left ${t.card} ${
-                          f.tier === "potential_conflict" ? "border-2" : ""
-                        } ${isSel ? "ring-2 ring-slate-900" : ""}`}
-                      >
-                        <span
-                          className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-semibold ${t.badge}`}
-                        >
-                          <span aria-hidden="true">{t.icon}</span> {t.label}
-                        </span>
-                        <p className="mt-1 text-sm font-medium text-slate-900">
-                          {f.entity_type.replace("_", " ")}: {f.entity_value}
-                        </p>
-                        <p className="mt-0.5 text-xs text-slate-600">{f.reason}</p>
-                        {isSel && notFound && (
-                          <p className="mt-2 rounded bg-white/70 px-2 py-1 text-xs font-medium text-slate-800">
-                            Not found in the transcript — confirm the source.
-                          </p>
-                        )}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-              {counts.verified > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setShowVerified((v) => !v)}
-                  className="mt-2 text-xs text-slate-600 underline"
-                >
-                  {showVerified ? "Hide" : "Show"} {counts.verified} verified
-                </button>
-              )}
+              ))}
             </div>
-          )}
+          </section>
 
           {hasResults && (
-            <div className="rounded-lg border border-slate-200 bg-white p-4">
+            <div className="rounded-lg border border-line bg-surface p-4">
               {reviewed ? (
-                <p className="text-sm font-medium text-green-800">
-                  ✓ Marked as reviewed. Nothing was signed or locked.
+                <p className="inline-flex items-center gap-2 text-sm font-medium text-verified">
+                  <TierIcon tier="verified" />
+                  Marked as reviewed. Nothing was signed or locked.
                 </p>
               ) : (
                 <>
-                  <p className="mb-2 text-xs text-slate-600">
+                  <p className="mb-3 text-sm text-muted">
                     Confirms you have seen the flags. This does not sign or lock the note.
                   </p>
                   <button
                     type="button"
                     disabled={reviewing}
                     onClick={onReview}
-                    className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
+                    className="btn btn-primary"
                   >
                     {reviewing ? "Saving..." : "Mark as reviewed"}
                   </button>
@@ -315,16 +323,58 @@ export function ReviewPanel({
           )}
         </div>
 
-        {/* Raw transcript: always present, sticky on desktop */}
-        <div className="rounded-lg border border-slate-200 bg-white p-4 md:sticky md:top-4">
-          <h2 className="text-sm font-medium text-slate-900">Raw transcript</h2>
-          <p className="mt-1 text-xs text-slate-500">
-            {transcript.language_mix} · {transcript.source}
-          </p>
-          <pre className="mt-3 max-h-[70vh] overflow-y-auto whitespace-pre-wrap font-sans text-sm text-slate-800">
-            {renderTranscript()}
-          </pre>
-        </div>
+        {/* Evidence: the raw transcript, always visible, sticky on desktop */}
+        <section
+          aria-labelledby="transcript-heading"
+          className="flex max-h-[70vh] min-w-0 flex-col overflow-hidden rounded-lg border border-line bg-surface md:sticky md:top-4 md:max-h-[calc(100vh-2rem)]"
+        >
+          <div className="shrink-0 border-b border-line px-4 py-3">
+            <h2 id="transcript-heading" className="text-sm font-semibold text-ink">
+              Raw transcript
+            </h2>
+            <dl className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted">
+              <div className="flex gap-1">
+                <dt>Language</dt>
+                <dd className="font-medium text-ink">
+                  {LANGUAGE_LABELS[transcript.language_mix] ?? transcript.language_mix}
+                </dd>
+              </div>
+              <div className="flex gap-1">
+                <dt>Entered</dt>
+                <dd className="font-medium text-ink">
+                  {SOURCE_LABELS[transcript.source] ?? transcript.source}
+                </dd>
+              </div>
+            </dl>
+            {selected && (
+              <p
+                className={`mt-2 flex items-center gap-1.5 border-l-4 py-0.5 pl-2 text-xs font-medium ${
+                  tierOf(selected.tier).text
+                } ${
+                  selected.tier === "potential_conflict"
+                    ? "border-conflict"
+                    : selected.tier === "verified"
+                      ? "border-verified"
+                      : "border-confirm"
+                }`}
+              >
+                <TierIcon tier={selected.tier} className="h-3.5 w-3.5" />
+                {span
+                  ? `Evidence for ${selected.entity_value}`
+                  : `No passage found for ${selected.entity_value}`}
+              </p>
+            )}
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-4">
+            <TranscriptView
+              raw={transcript.raw_text}
+              span={selected && span ? span : null}
+              markClass={selected ? tierOf(selected.tier).mark : ""}
+              markKey={selected?.id ?? null}
+              markRef={markRef}
+            />
+          </div>
+        </section>
       </div>
     </div>
   );
